@@ -6,7 +6,7 @@ const MAX_OUTPUT_LENGTH = 131072;
 const STATUS_MAP = { pending: "SUBMITTED", running: "IN_PROGRESS", completed: "SUCCESS", failed: "FAILURE" };
 
 export const meta = {
-  apiVersion: 1, key: "beeuni", name: "Beeuni", version: "0.1.0", icon: "text:BE",
+  apiVersion: 1, key: "beeuni", name: "Beeuni", version: "0.2.0", icon: "text:BE",
   author: { name: "BeeuniLab", url: "https://github.com/BeeuniLab" },
   website: "https://beeuni.ai",
   description: { en: "Run Beeuni Agent tasks and retrieve their text results", zh: "运行 Beeuni Agent 任务并获取文本结果" },
@@ -49,12 +49,43 @@ function uuid(value) {
 function promptBody(value) {
   if (!object(value)) throw new Error("A JSON object is required");
   for (const key of Object.keys(value)) {
-    if (key !== "model" && key !== "prompt") throw new Error("Unsupported request field");
+    if (key !== "model" && key !== "prompt" && key !== "previous_task_id") throw new Error("Unsupported request field");
   }
   if (typeof value.model !== "string" || !value.model.trim()) throw new Error("model is required");
   if (typeof value.prompt !== "string" || !value.prompt.trim() || value.prompt.length > MAX_PROMPT_LENGTH)
     throw new Error("prompt must contain 1 to 32768 characters");
-  return { model: value.model, prompt: value.prompt };
+  const body = { model: value.model, prompt: value.prompt };
+  if (value.previous_task_id !== undefined) {
+    if (typeof value.previous_task_id !== "string" || !/^[A-Za-z0-9._:+/=-]{1,128}$/.test(value.previous_task_id))
+      throw new Error("A public previous_task_id is required");
+    body.previous_task_id = value.previous_task_id;
+  }
+  return body;
+}
+
+// The host stores this reference privately; clients only use public task IDs.
+function taskRef(projectId, sessionId, promptId) {
+  return "beeuni:" + uuid(projectId) + ":" + uuid(sessionId) + (promptId ? ":" + uuid(promptId) : "");
+}
+
+function readTaskRef(value, projectId) {
+  if (typeof value !== "string") throw new Error("Invalid Beeuni task reference");
+  if (UUID.test(value)) return { project_id: projectId ? uuid(projectId) : null, session_id: uuid(value) };
+  const parts = value.split(":");
+  if (parts[0] !== "beeuni" || (parts.length !== 3 && parts.length !== 4)) throw new Error("Invalid Beeuni task reference");
+  return { project_id: uuid(parts[1]), session_id: uuid(parts[2]), ...(parts.length === 4 ? { prompt_id: uuid(parts[3]) } : {}) };
+}
+
+function originSession(ctx, body, projectId) {
+  const origins = ctx.originTasks || [];
+  if (origins.length !== 1 || origins[0].taskId !== body.previous_task_id)
+    throw new Error("The gateway must resolve the previous task");
+  const origin = origins[0];
+  if (origin.status !== "SUCCESS" || (origin.action !== "agent_task" && origin.action !== "agent_continue"))
+    throw new Error("Only a successful Beeuni task can be continued");
+  const ref = readTaskRef(origin.upstreamTaskId, projectId);
+  if (ref.project_id !== projectId) throw new Error("The channel project has changed; restore the original project");
+  return ref;
 }
 
 function channel(ctx) {
@@ -88,7 +119,16 @@ function failure(data) {
 export function buildSubmitRequest(ctx) {
   const projectId = channel(ctx);
   const body = promptBody(ctx.requestBody);
-  if (typeof ctx.publicTaskId !== "string" || !/^[A-Za-z0-9._:+/=-]{1,200}$/.test(ctx.publicTaskId)) throw new Error("A stable gateway task ID is required");
+  if (typeof ctx.publicTaskId !== "string" || !/^[A-Za-z0-9._:+/=-]{1,121}$/.test(ctx.publicTaskId)) throw new Error("A stable gateway task ID is required");
+  if (body.previous_task_id) {
+    const origin = originSession(ctx, body, projectId);
+    return {
+      url: address(ctx) + "/projects/" + projectId + "/sessions/" + origin.session_id + "/prompts", method: "POST",
+      headers: Object.assign(headers(ctx), { "Content-Type": "application/json" }),
+      body: { client_message_id: "newapi:" + ctx.publicTaskId, placement: "transcript", parts: [{ type: "text", text: body.prompt }] },
+    };
+  }
+  if (ctx.originTasks && ctx.originTasks.length) throw new Error("Unexpected origin task");
   const input = { initial_prompt: body.prompt, space_id: null };
   for (const name of ["agent_name", "model", "sandbox_slug"]) {
     const value = ctx.config[name];
@@ -104,24 +144,37 @@ export function buildSubmitRequest(ctx) {
 }
 
 export function parseSubmitResponse(ctx, response) {
+  const projectId = channel(ctx);
+  const body = promptBody(ctx.requestBody);
+  if (body.previous_task_id) {
+    const origin = originSession(ctx, body, projectId);
+    if ((response.statusCode !== 200 && response.statusCode !== 202) || !object(response.body)) throw new Error("Beeuni did not accept the prompt");
+    if (response.body.state === "failed") throw new Error("Beeuni could not deliver the prompt");
+    const promptId = uuid(response.body.prompt_id);
+    return { taskId: taskRef(projectId, origin.session_id, promptId), taskData: { output: [], truncated: false }, state: { project_id: projectId, prompt_id: promptId } };
+  }
   if (response.statusCode !== 201 && response.statusCode !== 202) throw new Error("Beeuni did not accept the session");
   if (!object(response.body)) throw new Error("Invalid Beeuni session response");
   if (!response.body.session_id) throw new Error("Beeuni session creation is still pending; retry with the same idempotency key");
-  return { taskId: uuid(response.body.session_id), taskData: { output: [], truncated: false }, state: { project_id: channel(ctx) } };
+  return { taskId: taskRef(projectId, response.body.session_id), taskData: { output: [], truncated: false }, state: { project_id: projectId } };
 }
 
 export function buildQueryRequest(ctx) {
   // Keep the original project if the administrator changes channel config.
   if (!object(ctx.state)) throw new Error("Missing Beeuni task state");
+  const ref = readTaskRef(ctx.taskId, ctx.state.project_id);
+  if (ref.project_id !== uuid(ctx.state.project_id)) throw new Error("Beeuni task project does not match");
   return {
-    url: address(ctx) + "/projects/" + uuid(ctx.state.project_id) + "/sessions/" + uuid(ctx.taskId) + "/result",
+    url: address(ctx) + "/projects/" + ref.project_id + "/sessions/" + ref.session_id + "/result" + (ref.prompt_id ? "?prompt_id=" + ref.prompt_id : ""),
     method: "GET", headers: headers(ctx),
   };
 }
 
 export function parseTaskResult(ctx, body) {
   if (!object(body) || !Object.prototype.hasOwnProperty.call(STATUS_MAP, body.status)) return { status: "UNKNOWN" };
-  if (body.session_id !== undefined && uuid(body.session_id) !== uuid(ctx.taskId)) throw new Error("Beeuni session ID does not match");
+  const ref = readTaskRef(ctx.taskId, ctx.state && ctx.state.project_id);
+  if (body.session_id !== undefined && uuid(body.session_id) !== ref.session_id) throw new Error("Beeuni session ID does not match");
+  if (ref.prompt_id && body.prompt_id !== ref.prompt_id) throw new Error("Beeuni API must support prompt-scoped results");
   if (!Array.isArray(body.output) || typeof body.truncated !== "boolean") throw new Error("Invalid Beeuni task result");
   let length = 0;
   for (const part of body.output) {
@@ -160,7 +213,8 @@ export const native = {
   createTask: function (ctx) {
     if (!ctx.body || ctx.body.kind !== "json") throw new Error("JSON body required");
     const body = promptBody(ctx.body.value);
-    return { kind: "submit", model: body.model, action: "agent_task", requestBody: body };
+    return { kind: "submit", model: body.model, action: body.previous_task_id ? "agent_continue" : "agent_task", requestBody: body,
+      ...(body.previous_task_id ? { originTaskIds: [body.previous_task_id] } : {}) };
   },
   taskCreated: function (ctx, task) { return { __status: 202, __headers: { "Retry-After": "3" }, __body: renderTask(ctx, task) }; },
   taskStatus: renderTask,

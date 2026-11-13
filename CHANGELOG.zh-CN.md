@@ -1,16 +1,15 @@
 ---
 changelogVersion: 1
 plugin: beeuni
-version: 0.1.0
+version: 0.2.0
 locale: zh-CN
 ---
 # Changelog
 
-## [0.1.0]
+## [0.2.0]
 
 ### Added
 
-- 通过 `POST /beeuni/v1/tasks` 提交 Beeuni Agent 任务，并通过 `GET /beeuni/v1/tasks/{task_id}` 查询状态和文本结果。
-- 使用渠道密钥和项目 ID 直连 Beeuni API，并在渠道配置中选择 Agent、模型和 sandbox。
-- 仅返回用户可见的助手文本，不转发原始思考块或工具日志，并用 `truncated` 标记不完整的结果。
-- 使用 `tasks` 字段，按 `beeuni-agent` 的成功任务数定价。
+- 支持用 `previous_task_id` 接着已成功的任务继续对话，通过 New API 校验任务归属，并调用 Beeuni 已有的消息提交接口。
+- 按消息 ID 查询续聊结果；响应无法确认本轮消息时拒绝返回，需配套 Beeuni API 支持。
+- 项目、会话和消息标识仅保存在网关服务端，保留对 0.1.0 任务的查询兼容。

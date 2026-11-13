@@ -5,6 +5,10 @@ import * as plugin from '../plugin.js';
 const PROJECT = '11111111-1111-4111-8111-111111111111';
 const SESSION = '22222222-2222-4222-8222-222222222222';
 const OTHER_PROJECT = '33333333-3333-4333-8333-333333333333';
+const PROMPT = '44444444-4444-4444-8444-444444444444';
+const OTHER_PROMPT = '55555555-5555-4555-8555-555555555555';
+const sessionRef = `beeuni:${PROJECT}:${SESSION}`;
+const promptRef = `${sessionRef}:${PROMPT}`;
 const ctx = {
   baseUrl: 'https://api.beeuni.ai', apiKey: 'test-credential',
   model: 'beeuni-agent', upstreamModel: 'beeuni-agent',
@@ -14,10 +18,15 @@ const ctx = {
 const query = { ...ctx, taskId: SESSION, state: { project_id: PROJECT } };
 const result = { session_id: SESSION, status: 'completed', output: [{ type: 'text', text: '4' }], truncated: false, error: null };
 const create = (value) => plugin.native.createTask({ body: { kind: 'json', value } });
+const continuation = {
+  ...ctx, publicTaskId: 'task_gateway_2',
+  requestBody: { model: 'beeuni-agent', prompt: 'Multiply the answer by 3.', previous_task_id: 'task_gateway_1' },
+  originTasks: [{ taskId: 'task_gateway_1', upstreamTaskId: sessionRef, action: 'agent_task', status: 'SUCCESS' }],
+};
 
 test('declares a direct Beeuni task channel with administrator configuration', () => {
   assert.equal(plugin.meta.apiVersion, 1);
-  assert.equal(plugin.meta.version, '0.1.0');
+  assert.equal(plugin.meta.version, '0.2.0');
   assert.equal(plugin.meta.baseUrl, 'https://api.beeuni.ai');
   assert.equal(plugin.meta.fetchMode, 'per_task');
   assert.deepEqual(plugin.meta.models, ['beeuni-agent']);
@@ -93,7 +102,7 @@ test('requires credentials and a stable gateway task identity', () => {
 test('accepts created and queued sessions without exposing upstream session objects', () => {
   for (const statusCode of [201, 202]) {
     const value = plugin.parseSubmitResponse(ctx, { statusCode, body: { session_id: SESSION, internal: 'private-token' } });
-    assert.equal(value.taskId, SESSION);
+    assert.equal(value.taskId, sessionRef);
     assert.deepEqual(value.taskData, { output: [], truncated: false });
     assert.deepEqual(value.state, { project_id: PROJECT });
     assert.ok(!JSON.stringify(value.taskData).includes(SESSION));
@@ -103,6 +112,77 @@ test('accepts created and queued sessions without exposing upstream session obje
     assert.throws(() => plugin.parseSubmitResponse(ctx, { statusCode: 201, body }));
   assert.throws(() => plugin.parseSubmitResponse(ctx, { statusCode: 202, body: { command_id: 'queued-only' } }));
   assert.throws(() => plugin.parseSubmitResponse(ctx, { statusCode: 401, body: { error: 'secret' } }));
+});
+
+test('continuation decoder asks the host to resolve only the public previous task', () => {
+  assert.deepEqual(create(continuation.requestBody), {
+    kind: 'submit', model: 'beeuni-agent', action: 'agent_continue',
+    requestBody: continuation.requestBody, originTaskIds: ['task_gateway_1'],
+  });
+  for (const previous_task_id of ['', null, 12, '../other?', 'bad\nvalue', 'x'.repeat(129)])
+    assert.throws(() => create({ ...continuation.requestBody, previous_task_id }));
+});
+
+test('continues the resolved session with a stable, bounded prompt identity', () => {
+  const request = plugin.buildSubmitRequest(continuation);
+  assert.deepEqual(request, {
+    url: `https://api.beeuni.ai/v1/projects/${PROJECT}/sessions/${SESSION}/prompts`, method: 'POST',
+    headers: { Authorization: 'Bearer test-credential', Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: { client_message_id: 'newapi:task_gateway_2', placement: 'transcript', parts: [{ type: 'text', text: continuation.requestBody.prompt }] },
+  });
+  assert.deepEqual(plugin.buildSubmitRequest(continuation), request);
+  const config = { ...ctx.config, agent_name: 'different', model: 'different', sandbox_slug: 'different' };
+  assert.deepEqual(plugin.buildSubmitRequest({ ...continuation, config }), request);
+  assert.equal(plugin.buildSubmitRequest({ ...continuation, publicTaskId: 'x'.repeat(121) }).body.client_message_id.length, 128);
+  assert.throws(() => plugin.buildSubmitRequest({ ...continuation, publicTaskId: 'x'.repeat(122) }));
+});
+
+test('requires a host-resolved, successful Beeuni origin in the unchanged project', () => {
+  for (const originTasks of [undefined, [], [continuation.originTasks[0], continuation.originTasks[0]],
+    [{ ...continuation.originTasks[0], taskId: 'other' }]])
+    assert.throws(() => plugin.buildSubmitRequest({ ...continuation, originTasks }), /resolve/);
+  for (const status of ['SUBMITTED', 'IN_PROGRESS', 'FAILURE', 'UNKNOWN'])
+    assert.throws(() => plugin.buildSubmitRequest({ ...continuation, originTasks: [{ ...continuation.originTasks[0], status }] }), /successful/);
+  assert.throws(() => plugin.buildSubmitRequest({ ...continuation, originTasks: [{ ...continuation.originTasks[0], action: 'other' }] }), /successful/);
+  assert.throws(() => plugin.buildSubmitRequest({ ...continuation, config: { ...ctx.config, project_id: OTHER_PROJECT } }), /project has changed/);
+  assert.throws(() => plugin.buildSubmitRequest({ ...continuation, originTasks: [{ ...continuation.originTasks[0], upstreamTaskId: '../other' }] }));
+  assert.throws(() => plugin.buildSubmitRequest({ ...ctx, originTasks: continuation.originTasks }), /Unexpected origin/);
+  for (const upstreamTaskId of [SESSION, promptRef])
+    assert.equal(plugin.buildSubmitRequest({ ...continuation, originTasks: [{ ...continuation.originTasks[0], action: 'agent_continue', upstreamTaskId }] }).url,
+      `https://api.beeuni.ai/v1/projects/${PROJECT}/sessions/${SESSION}/prompts`);
+});
+
+test('accepted and deduplicated prompts retain distinct private task references', () => {
+  for (const statusCode of [200, 202]) {
+    const accepted = plugin.parseSubmitResponse(continuation, { statusCode, body: { prompt_id: PROMPT, deduped: statusCode === 200, state: 'queued', message_id: 'not-the-final-wire-id', private: 'discard' } });
+    assert.deepEqual(accepted, { taskId: promptRef, taskData: { output: [], truncated: false }, state: { project_id: PROJECT, prompt_id: PROMPT } });
+    assert.ok(!JSON.stringify(accepted).includes('discard'));
+    assert.notEqual(plugin.parseSubmitResponse(continuation, { statusCode, body: { prompt_id: OTHER_PROMPT } }).taskId, accepted.taskId);
+  }
+  for (const response of [
+    { statusCode: 201, body: { prompt_id: PROMPT } }, { statusCode: 401, body: { prompt_id: PROMPT } },
+    { statusCode: 202, body: null }, { statusCode: 202, body: {} },
+    { statusCode: 202, body: { prompt_id: PROMPT, state: 'failed' } },
+  ]) assert.throws(() => plugin.parseSubmitResponse(continuation, response));
+});
+
+test('queries and accepts only the requested prompt result', () => {
+  const promptQuery = { ...query, taskId: promptRef, state: { project_id: PROJECT, prompt_id: PROMPT } };
+  assert.equal(plugin.buildQueryRequest(promptQuery).url,
+    `https://api.beeuni.ai/v1/projects/${PROJECT}/sessions/${SESSION}/result?prompt_id=${PROMPT}`);
+  for (const [status, expected] of [['pending', 'SUBMITTED'], ['running', 'IN_PROGRESS'], ['completed', 'SUCCESS'], ['failed', 'FAILURE']])
+    assert.equal(plugin.parseTaskResult(promptQuery, { ...result, prompt_id: PROMPT, status }).status, expected);
+  for (const prompt_id of [undefined, OTHER_PROMPT, '../other'])
+    assert.throws(() => plugin.parseTaskResult(promptQuery, { ...result, prompt_id }), /prompt-scoped/);
+  assert.throws(() => plugin.buildQueryRequest({ ...promptQuery, state: { project_id: OTHER_PROJECT } }), /project does not match/);
+});
+
+test('private references and prompt IDs never leak through public presenters', () => {
+  const rendered = plugin.native.taskStatus({}, { task_id: 'task_gateway_2', status: 'SUCCESS',
+    data: { ...result, prompt_id: PROMPT, upstream_task_id: promptRef } });
+  assert.equal(rendered.id, 'task_gateway_2');
+  assert.ok(!JSON.stringify(rendered).includes(SESSION));
+  assert.ok(!JSON.stringify(rendered).includes(PROMPT));
 });
 
 test('queries only the safe result route and pins the original project', () => {

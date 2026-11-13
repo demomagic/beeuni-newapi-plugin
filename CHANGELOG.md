@@ -1,18 +1,17 @@
 ---
 changelogVersion: 1
 plugin: beeuni
-version: 0.1.0
+version: 0.2.0
 locale: en
 translations:
   zh-CN: CHANGELOG.zh-CN.md
 ---
 # Changelog
 
-## [0.1.0]
+## [0.2.0]
 
 ### Added
 
-- Submit Beeuni Agent tasks through `POST /beeuni/v1/tasks` and poll their status and text results through `GET /beeuni/v1/tasks/{task_id}`.
-- Connect directly to the Beeuni API with a channel key and project ID; select the Agent, model, and sandbox in channel settings.
-- Return visible assistant text without forwarding raw reasoning or tool logs, and mark incomplete results with `truncated`.
-- Price `beeuni-agent` by successful task count using the `tasks` field.
+- Continue a successful task with `previous_task_id`, using New API's origin-task ownership checks and Beeuni's existing prompt endpoint.
+- Read continuation results by prompt ID, rejecting responses that cannot identify the requested prompt. Requires corresponding Beeuni API support.
+- Keep project, session, and prompt references private; retain polling compatibility for 0.1.0 tasks.

@@ -1,6 +1,54 @@
 {
   "cases": [
     {
+      "name": "continuation decoder declares an owned prior gateway task",
+      "hook": "native", "member": "createTask",
+      "args": [{"body":{"kind":"json","value":{"model":"beeuni-agent","prompt":"Multiply that by 3","previous_task_id":"public-prior"}}}],
+      "expected": {"kind":"submit","model":"beeuni-agent","action":"agent_continue","requestBody":{"model":"beeuni-agent","prompt":"Multiply that by 3","previous_task_id":"public-prior"},"originTaskIds":["public-prior"]}
+    },
+    {
+      "name": "continuation reuses the resolved session through prompts",
+      "hook": "buildSubmitRequest",
+      "args": [{"model":"beeuni-agent","requestBody":{"model":"beeuni-agent","prompt":"Multiply that by 3","previous_task_id":"public-prior"},"publicTaskId":"public-next","baseUrl":"https://api.beeuni.ai","apiKey":"test-fixture-key","config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true},"originTasks":[{"taskId":"public-prior","upstreamTaskId":"beeuni:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222","status":"SUCCESS","action":"agent_task"}]}],
+      "expected": {"url":"https://api.beeuni.ai/v1/projects/11111111-1111-4111-8111-111111111111/sessions/22222222-2222-4222-8222-222222222222/prompts","method":"POST","headers":{"Authorization":"Bearer test-fixture-key","Accept":"application/json","Content-Type":"application/json"},"body":{"client_message_id":"newapi:public-next","placement":"transcript","parts":[{"type":"text","text":"Multiply that by 3"}]}}
+    },
+    {
+      "name": "continuation cannot use an unresolved prior task",
+      "hook": "buildSubmitRequest",
+      "args": [{"model":"beeuni-agent","requestBody":{"model":"beeuni-agent","prompt":"Continue","previous_task_id":"public-prior"},"publicTaskId":"public-next","config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true}}],
+      "expectedError": "The gateway must resolve the previous task"
+    },
+    {
+      "name": "continuation cannot start while the prior task runs",
+      "hook": "buildSubmitRequest",
+      "args": [{"model":"beeuni-agent","requestBody":{"model":"beeuni-agent","prompt":"Continue","previous_task_id":"public-prior"},"publicTaskId":"public-next","config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true},"originTasks":[{"taskId":"public-prior","upstreamTaskId":"beeuni:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222","status":"IN_PROGRESS","action":"agent_task"}]}],
+      "expectedError": "Only a successful Beeuni task can be continued"
+    },
+    {
+      "name": "accepted prompt gets a prompt-specific private reference",
+      "hook": "parseSubmitResponse",
+      "args": [{"model":"beeuni-agent","requestBody":{"model":"beeuni-agent","prompt":"Continue","previous_task_id":"public-prior"},"config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true},"originTasks":[{"taskId":"public-prior","upstreamTaskId":"beeuni:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222","status":"SUCCESS","action":"agent_task"}]},{"statusCode":202,"body":{"prompt_id":"44444444-4444-4444-8444-444444444444","state":"queued","message_id":"discard"}}],
+      "expected": {"taskId":"beeuni:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222:44444444-4444-4444-8444-444444444444","taskData":{"output":[],"truncated":false},"state":{"project_id":"11111111-1111-4111-8111-111111111111","prompt_id":"44444444-4444-4444-8444-444444444444"}}
+    },
+    {
+      "name": "continuation query selects the accepted prompt",
+      "hook": "buildQueryRequest",
+      "args": [{"taskId":"beeuni:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222:44444444-4444-4444-8444-444444444444","apiKey":"test-fixture-key","state":{"project_id":"11111111-1111-4111-8111-111111111111"}}],
+      "expected": {"url":"https://api.beeuni.ai/v1/projects/11111111-1111-4111-8111-111111111111/sessions/22222222-2222-4222-8222-222222222222/result?prompt_id=44444444-4444-4444-8444-444444444444","method":"GET","headers":{"Authorization":"Bearer test-fixture-key","Accept":"application/json"}}
+    },
+    {
+      "name": "matching prompt result is successful",
+      "hook": "parseTaskResult",
+      "args": [{"taskId":"beeuni:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222:44444444-4444-4444-8444-444444444444"},{"session_id":"22222222-2222-4222-8222-222222222222","prompt_id":"44444444-4444-4444-8444-444444444444","status":"completed","output":[{"type":"text","text":"12"}],"truncated":false,"error":null}],
+      "expected": {"status":"SUCCESS","progress":"100%"}
+    },
+    {
+      "name": "old APIs cannot accidentally return the previous answer",
+      "hook": "parseTaskResult",
+      "args": [{"taskId":"beeuni:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222:44444444-4444-4444-8444-444444444444"},{"session_id":"22222222-2222-4222-8222-222222222222","status":"completed","output":[{"type":"text","text":"4"}],"truncated":false,"error":null}],
+      "expectedError": "Beeuni API must support prompt-scoped results"
+    },
+    {
       "name": "native decoder returns an agent task",
       "hook": "native", "member": "createTask",
       "args": [{"body":{"kind":"json","value":{"model":"beeuni-agent","prompt":"Calculate 2 + 2"}}}],
@@ -27,14 +75,14 @@
     {
       "name": "created session response retains no upstream object",
       "hook": "parseSubmitResponse",
-      "args": [{"model":"beeuni-agent","config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true}},{"statusCode":201,"body":{"session_id":"22222222-2222-4222-8222-222222222222","internal":"discard"}}],
-      "expected": {"taskId":"22222222-2222-4222-8222-222222222222","taskData":{"output":[],"truncated":false},"state":{"project_id":"11111111-1111-4111-8111-111111111111"}}
+      "args": [{"model":"beeuni-agent","requestBody":{"model":"beeuni-agent","prompt":"Hello"},"config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true}},{"statusCode":201,"body":{"session_id":"22222222-2222-4222-8222-222222222222","internal":"discard"}}],
+      "expected": {"taskId":"beeuni:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222","taskData":{"output":[],"truncated":false},"state":{"project_id":"11111111-1111-4111-8111-111111111111"}}
     },
     {
       "name": "queued session response retains the same project pin",
       "hook": "parseSubmitResponse",
-      "args": [{"model":"beeuni-agent","config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true}},{"statusCode":202,"body":{"session_id":"22222222-2222-4222-8222-222222222222","status":"queued"}}],
-      "expected": {"taskId":"22222222-2222-4222-8222-222222222222","taskData":{"output":[],"truncated":false},"state":{"project_id":"11111111-1111-4111-8111-111111111111"}}
+      "args": [{"model":"beeuni-agent","requestBody":{"model":"beeuni-agent","prompt":"Hello"},"config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true}},{"statusCode":202,"body":{"session_id":"22222222-2222-4222-8222-222222222222","status":"queued"}}],
+      "expected": {"taskId":"beeuni:11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222","taskData":{"output":[],"truncated":false},"state":{"project_id":"11111111-1111-4111-8111-111111111111"}}
     },
     {
       "name": "unknown polling state is not progress",

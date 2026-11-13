@@ -38,9 +38,14 @@ The English and Chinese guides and release notes were reviewed against
 `docs/plugin-api/v1.md`. `tests/distribution.test.js` checks selected format
 and content invariants; it is not the marketplace's Markdown validator.
 
-On the same date, the plugin request builders and response parsers were
+On the same date, the 0.1.0 plugin request builders and response parsers were
 exercised against the hosted Beeuni API: session creation, running/completed
 results, native result rendering, and replay with the same idempotency key.
 Replay reused the session. This was a direct API test, not a full New API
 gateway deployment or marketplace review. No live identifiers or credentials
 are included in the fixtures or distribution archive.
+
+The 0.2.0 continuation changes have local unit tests and official-runtime
+fixtures, including origin-task resolution and prompt-scoped result checks.
+They have not been verified against the hosted API or a deployed New API
+gateway. The earlier 0.1.0 live checks do not establish continuation support.
