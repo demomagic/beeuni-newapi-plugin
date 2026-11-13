@@ -3,6 +3,8 @@ locale: zh-CN
 ---
 # Beeuni
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 通过 New API 调用 Beeuni Agent。安装插件，填写 Beeuni API Key 和项目 ID，即可向网关提交提示词。每次提交新建一个 Beeuni 会话，不需要另行部署适配服务。
 
 ## 使用条件

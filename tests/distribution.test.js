@@ -12,6 +12,7 @@ test('community plugin guides have English fallback and matching translations', 
     assert.ok(Buffer.byteLength(text) < 256 * 1024);
     assert.ok(!text.startsWith('\ufeff'));
     assert.match(text, /^# Beeuni$/m);
+    assert.ok(text.includes('[English](README.md) | [简体中文](README.zh-CN.md)'));
     assert.ok(!/!\[|<\/?[a-z][^>]*>/i.test(text), 'Marketplace guides cannot contain images or raw HTML');
     for (const required of ['beeuni-agent', '/beeuni/v1/tasks', '/sessions/{session_id}/result', 'project_id', 'accept_shared_project', 'beeuni_pat_', 'Entire workspace', 'BEEUNI_PLUGIN_OK', '"status": "SUCCESS"', 'https://api.beeuni.ai', 'truncated', 'npm run pack:plugin']) assert.ok(text.includes(required), 'Missing guide detail: ' + required);
     for (const removed of ['BEEUNI_TASK_SIGNING_KEY', 'BEEUNI_ACCEPT_SHARED_PROJECT', '.env.example', 'npm start']) assert.ok(!text.includes(removed));

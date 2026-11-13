@@ -5,6 +5,8 @@ translations:
 ---
 # Beeuni
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 Run Beeuni Agent tasks through New API. Install the plugin, provide a Beeuni API key and project ID, then submit prompts to your gateway. Each submission creates a new Beeuni session. No separate adapter service is required.
 
 ## Requirements
