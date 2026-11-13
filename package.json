@@ -1,0 +1,13 @@
+{
+  "name": "beeuni-newapi-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Beeuni Agent task integration for New API",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check plugin.js && node --test",
+    "pack:plugin": "npm run check && node scripts/pack-plugin.js"
+  }
+}

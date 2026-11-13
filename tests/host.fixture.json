@@ -1,0 +1,96 @@
+{
+  "cases": [
+    {
+      "name": "native decoder returns an agent task",
+      "hook": "native", "member": "createTask",
+      "args": [{"body":{"kind":"json","value":{"model":"beeuni-agent","prompt":"Calculate 2 + 2"}}}],
+      "expected": {"kind":"submit","model":"beeuni-agent","action":"agent_task","requestBody":{"model":"beeuni-agent","prompt":"Calculate 2 + 2"}}
+    },
+    {
+      "name": "submission creates a Beeuni session directly",
+      "hook": "buildSubmitRequest",
+      "args": [{"requestBody":{"model":"beeuni-agent","prompt":"Calculate 2 + 2"},"model":"beeuni-agent","baseUrl":"https://api.beeuni.ai/v1/","apiKey":"test-fixture-key","publicTaskId":"task-fixture","config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true},"requestHeaders":{"Cookie":"client-cookie","X-Private":"client-secret"}}],
+      "expected": {"url":"https://api.beeuni.ai/v1/projects/11111111-1111-4111-8111-111111111111/sessions","method":"POST","headers":{"Authorization":"Bearer test-fixture-key","Accept":"application/json","Content-Type":"application/json","Idempotency-Key":"newapi:task-fixture"},"body":{"initial_prompt":"Calculate 2 + 2","space_id":null}}
+    },
+    {
+      "name": "administrator selects Agent model and sandbox",
+      "hook": "buildSubmitRequest",
+      "args": [{"requestBody":{"model":"beeuni-agent","prompt":"Calculate 2 + 2"},"model":"beeuni-agent","baseUrl":"https://api.beeuni.ai","apiKey":"test-fixture-key","publicTaskId":"task-fixture","config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true,"agent_name":"writer","model":"provider/model","sandbox_slug":"default"}}],
+      "expected": {"url":"https://api.beeuni.ai/v1/projects/11111111-1111-4111-8111-111111111111/sessions","method":"POST","headers":{"Authorization":"Bearer test-fixture-key","Accept":"application/json","Content-Type":"application/json","Idempotency-Key":"newapi:task-fixture"},"body":{"initial_prompt":"Calculate 2 + 2","space_id":null,"agent_name":"writer","model":"provider/model","sandbox_slug":"default"}}
+    },
+    {
+      "name": "query uses safe result route and persisted project",
+      "hook": "buildQueryRequest",
+      "args": [{"taskId":"22222222-2222-4222-8222-222222222222","baseUrl":"https://api.beeuni.ai/","apiKey":"test-fixture-key","config":{"project_id":"33333333-3333-4333-8333-333333333333","accept_shared_project":true},"state":{"project_id":"11111111-1111-4111-8111-111111111111"}}],
+      "expected": {"url":"https://api.beeuni.ai/v1/projects/11111111-1111-4111-8111-111111111111/sessions/22222222-2222-4222-8222-222222222222/result","method":"GET","headers":{"Authorization":"Bearer test-fixture-key","Accept":"application/json"}}
+    },
+    {
+      "name": "created session response retains no upstream object",
+      "hook": "parseSubmitResponse",
+      "args": [{"model":"beeuni-agent","config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true}},{"statusCode":201,"body":{"session_id":"22222222-2222-4222-8222-222222222222","internal":"discard"}}],
+      "expected": {"taskId":"22222222-2222-4222-8222-222222222222","taskData":{"output":[],"truncated":false},"state":{"project_id":"11111111-1111-4111-8111-111111111111"}}
+    },
+    {
+      "name": "queued session response retains the same project pin",
+      "hook": "parseSubmitResponse",
+      "args": [{"model":"beeuni-agent","config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true}},{"statusCode":202,"body":{"session_id":"22222222-2222-4222-8222-222222222222","status":"queued"}}],
+      "expected": {"taskId":"22222222-2222-4222-8222-222222222222","taskData":{"output":[],"truncated":false},"state":{"project_id":"11111111-1111-4111-8111-111111111111"}}
+    },
+    {
+      "name": "unknown polling state is not progress",
+      "hook": "parseTaskResult",
+      "args": [{"taskId":"22222222-2222-4222-8222-222222222222"},{"status":"mystery"}],
+      "expected": {"status":"UNKNOWN"}
+    },
+    {
+      "name": "pending maps to submitted",
+      "hook": "parseTaskResult",
+      "args": [{"taskId":"22222222-2222-4222-8222-222222222222"},{"session_id":"22222222-2222-4222-8222-222222222222","status":"pending","output":[],"truncated":false,"error":null}],
+      "expected": {"status":"SUBMITTED"}
+    },
+    {
+      "name": "running maps to in progress",
+      "hook": "parseTaskResult",
+      "args": [{"taskId":"22222222-2222-4222-8222-222222222222"},{"session_id":"22222222-2222-4222-8222-222222222222","status":"running","output":[],"truncated":false,"error":null}],
+      "expected": {"status":"IN_PROGRESS"}
+    },
+    {
+      "name": "completed text maps to success",
+      "hook": "parseTaskResult",
+      "args": [{"taskId":"22222222-2222-4222-8222-222222222222"},{"session_id":"22222222-2222-4222-8222-222222222222","status":"completed","output":[{"type":"text","text":"4"}],"truncated":false,"error":null}],
+      "expected": {"status":"SUCCESS","progress":"100%"}
+    },
+    {
+      "name": "unsupported text has a safe error",
+      "hook": "parseTaskResult",
+      "args": [{"taskId":"22222222-2222-4222-8222-222222222222"},{"status":"failed","output":[],"truncated":false,"error":{"code":"text_result_unavailable","message":"private diagnostic"}}],
+      "expected": {"status":"FAILURE","reason":"The task completed without a supported text result"}
+    },
+    {
+      "name": "failed tasks have no billable units",
+      "hook": "extractUsageOnComplete", "args": [{},{"status":"FAILURE"}], "expected": {"tasks":0}
+    },
+    {
+      "name": "successful tasks settle one task unit",
+      "hook": "extractUsageOnComplete", "args": [{},{"status":"SUCCESS"}], "expected": {"tasks":1}
+    },
+    {
+      "name": "native presenter filters private fields",
+      "hook": "native", "member": "taskStatus",
+      "args": [{},{"task_id":"public-task","status":"SUCCESS","data":{"session_id":"22222222-2222-4222-8222-222222222222","output":[{"type":"text","text":"4","private":"discard"},{"type":"reasoning","text":"hidden"}],"truncated":false,"secret":"discard"}}],
+      "expected": {"id":"public-task","model":"beeuni-agent","status":"SUCCESS","output":[{"type":"text","text":"4"}],"truncated":false,"error":null}
+    },
+    {
+      "name": "client project injection is rejected",
+      "hook": "native", "member": "createTask",
+      "args": [{"body":{"kind":"json","value":{"model":"beeuni-agent","prompt":"Hello","project_id":"other-project"}}}],
+      "expectedError": "Unsupported request field"
+    },
+    {
+      "name": "empty prompts are rejected",
+      "hook": "native", "member": "createTask",
+      "args": [{"body":{"kind":"json","value":{"model":"beeuni-agent","prompt":"  "}}}],
+      "expectedError": "prompt must contain 1 to 32768 characters"
+    }
+  ]
+}
