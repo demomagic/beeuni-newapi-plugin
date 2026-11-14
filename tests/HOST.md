@@ -16,6 +16,14 @@ Set `NEW_API_BIN` to that executable's absolute path. From this repository root:
 The CLI compiles the source and validates its manifest before running fixtures.
 Do not replace these checks with a JSON-schema check alone.
 
+Runtime lint executes the module, so it does not establish that the marketplace
+can read metadata statically. `tests/distribution.test.js` separately parses
+the `meta` declaration as JSON and rejects variable references and expressions.
+
+Version 0.2.1 passed lint and all 26 fixture cases using the official macOS
+arm64 release executable `v1.0.0-rc.51` on 2026-11-14. Its SHA-256 matched
+the release's `checksums-macos.txt`. This does not certify marketplace acceptance.
+
 The initial implementation was checked against New API source commit
 `c9c6da2786b6a0912215127e78e28fbc6650c85f`.
 The plugin contract reference is
@@ -47,5 +55,6 @@ are included in the fixtures or distribution archive.
 
 The 0.2.0 continuation changes have local unit tests and official-runtime
 fixtures, including origin-task resolution and prompt-scoped result checks.
-They have not been verified against the hosted API or a deployed New API
-gateway. The earlier 0.1.0 live checks do not establish continuation support.
+Direct hosted-API checks also verified continuation context, matching prompt
+IDs, and idempotent replay. These checks did not deploy a New API gateway or
+validate marketplace acceptance.

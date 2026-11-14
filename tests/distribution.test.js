@@ -3,6 +3,24 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { meta } from '../plugin.js';
 
+function literalManifest(source) {
+  const declaration = source.match(/^export const meta = (\{[\s\S]*?^\});$/m);
+  assert.ok(declaration, 'Keep meta as a standalone JSON object literal');
+  return JSON.parse(declaration[1]);
+}
+
+test('marketplace can read metadata without executing plugin code', async () => {
+  const source = await readFile(new URL('../plugin.js', import.meta.url), 'utf8');
+  assert.deepEqual(literalManifest(source), meta);
+});
+
+test('static metadata check rejects expressions at any depth', () => {
+  for (const value of ['MODEL', 'makeModel()', '...MODELS', '`beeuni-agent`'])
+    assert.throws(() => literalManifest('export const meta = {\n"models": [' + value + ']\n};'));
+  assert.throws(() => literalManifest('export const meta = {\n"author": {"name": AUTHOR}\n};'));
+  assert.deepEqual(literalManifest('export const meta = {\n"models": ["beeuni-agent"]\n};'), { models: ['beeuni-agent'] });
+});
+
 test('community plugin guides have English fallback and matching translations', async () => {
   const english = await readFile(new URL('../README.md', import.meta.url), 'utf8');
   const chinese = await readFile(new URL('../README.zh-CN.md', import.meta.url), 'utf8');

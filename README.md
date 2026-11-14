@@ -128,7 +128,7 @@ Continuation results are matched to the submitted prompt, not whichever answer h
 - The result API returns visible final assistant text, not raw tool parameters, tool outputs, reasoning blocks, or hidden messages. Saved text previews and output limits may truncate a result. A completed task without a supported text answer reports `text_result_unavailable`.
 - Result reads use persisted state and logs without waking the sandbox. A task waiting for approval may remain pending until handled in Beeuni.
 - A new-session task reads that session's most recently ended turn; a continuation reads its specific prompt's turn. Neither is a project-wide summary or proof that every background Agent has finished.
-- Version 0.2.0 does not provide Chat Completions or Responses compatibility, streaming, cancellation, file downloads, or total-cost metering.
+- Version 0.2.1 does not provide Chat Completions or Responses compatibility, streaming, cancellation, file downloads, or total-cost metering.
 
 ## Development and distribution
 
@@ -138,4 +138,4 @@ Run `npm test` for local tests and `npm run check` for syntax checks and tests. 
 
 The single-file plugin, bilingual usage guides, and version-specific release notes follow the [community plugin format](https://github.com/QuantumNous/new-api-plugins/blob/main/docs/plugin-api/v1.md#usage-guide-readme). Uploading a plugin does not list it in the marketplace; publication requires a separate submission and review.
 
-The community plugin key is `demomagic_beeuni`; the display name is Beeuni. Version tags use `v0.2.0` for this release. If you manually installed the earlier development plugin with key `beeuni`, disable it before installing this plugin, then bind the channel to the new key and configure its price. Existing tasks retain their original plugin identity; finish them before switching.
+The community plugin key is `demomagic_beeuni`; the display name is Beeuni. Version tags use `v0.2.1` for this release. If you manually installed the earlier development plugin with key `beeuni`, disable it before installing this plugin, then bind the channel to the new key and configure its price. Existing tasks retain their original plugin identity; finish them before switching.

@@ -1,6 +1,18 @@
 {
   "cases": [
     {
+      "name": "public model alias maps to the Beeuni task model",
+      "hook": "buildSubmitRequest",
+      "args": [{"model":"public-alias","upstreamModel":"beeuni-agent","requestBody":{"model":"public-alias","prompt":"Hello"},"apiKey":"test-fixture-key","publicTaskId":"task-alias","config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true}}],
+      "expected": {"url":"https://api.beeuni.ai/v1/projects/11111111-1111-4111-8111-111111111111/sessions","method":"POST","headers":{"Authorization":"Bearer test-fixture-key","Accept":"application/json","Content-Type":"application/json","Idempotency-Key":"newapi:task-alias"},"body":{"initial_prompt":"Hello","space_id":null}}
+    },
+    {
+      "name": "submission without a session ID is rejected",
+      "hook": "parseSubmitResponse",
+      "args": [{"model":"beeuni-agent","requestBody":{"model":"beeuni-agent","prompt":"Hello"},"config":{"project_id":"11111111-1111-4111-8111-111111111111","accept_shared_project":true}},{"statusCode":202,"body":{}}],
+      "expectedError": "Beeuni session creation is still pending; retry with the same idempotency key"
+    },
+    {
       "name": "continuation decoder declares an owned prior gateway task",
       "hook": "native", "member": "createTask",
       "args": [{"body":{"kind":"json","value":{"model":"beeuni-agent","prompt":"Multiply that by 3","previous_task_id":"public-prior"}}}],

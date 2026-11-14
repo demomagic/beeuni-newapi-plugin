@@ -28,7 +28,7 @@ test('declares a direct Beeuni task channel with administrator configuration', (
   assert.equal(plugin.meta.apiVersion, 1);
   assert.equal(plugin.meta.key, 'demomagic_beeuni');
   assert.deepEqual(plugin.meta.name, { en: 'Beeuni', zh: 'Beeuni 智能体' });
-  assert.equal(plugin.meta.version, '0.2.0');
+  assert.equal(plugin.meta.version, '0.2.1');
   assert.equal(plugin.meta.baseUrl, 'https://api.beeuni.ai');
   assert.equal(plugin.meta.fetchMode, 'per_task');
   assert.deepEqual(plugin.meta.models, ['beeuni-agent']);

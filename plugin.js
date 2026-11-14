@@ -6,37 +6,43 @@ const MAX_OUTPUT_LENGTH = 131072;
 const STATUS_MAP = { pending: "SUBMITTED", running: "IN_PROGRESS", completed: "SUCCESS", failed: "FAILURE" };
 
 export const meta = {
-  apiVersion: 1, key: "demomagic_beeuni", name: { en: "Beeuni", zh: "Beeuni 智能体" }, version: "0.2.0", icon: "text:BE",
-  author: { name: "BeeuniLab", url: "https://github.com/BeeuniLab" },
-  website: "https://beeuni.ai",
-  description: { en: "Run Beeuni Agent tasks and retrieve their text results", zh: "运行 Beeuni Agent 任务并获取文本结果" },
-  baseUrl: "https://api.beeuni.ai", auth: "api_key",
-  keyHint: { en: "Beeuni API key", zh: "Beeuni API Key" },
-  models: [MODEL], fetchMode: "per_task",
-  channelConfig: {
-    type: "object",
-    properties: {
-      project_id: {
-        type: "string", title: { en: "Project ID", zh: "项目 ID" },
-        pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+  "apiVersion": 1,
+  "key": "demomagic_beeuni",
+  "name": { "en": "Beeuni", "zh": "Beeuni 智能体" },
+  "version": "0.2.1",
+  "icon": "text:BE",
+  "author": { "name": "demomagic", "url": "https://github.com/demomagic" },
+  "website": "https://beeuni.ai",
+  "description": { "en": "Run Beeuni Agent tasks and retrieve their text results", "zh": "运行 Beeuni Agent 任务并获取文本结果" },
+  "baseUrl": "https://api.beeuni.ai",
+  "auth": "api_key",
+  "keyHint": { "en": "Beeuni API key", "zh": "Beeuni API Key" },
+  "models": ["beeuni-agent"],
+  "fetchMode": "per_task",
+  "channelConfig": {
+    "type": "object",
+    "properties": {
+      "project_id": {
+        "type": "string", "title": { "en": "Project ID", "zh": "项目 ID" },
+        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
       },
-      agent_name: { type: "string", title: { en: "Agent name", zh: "Agent 名称" }, maxLength: 128 },
-      model: { type: "string", title: { en: "Underlying model", zh: "底层模型" }, maxLength: 256 },
-      sandbox_slug: { type: "string", title: { en: "Sandbox", zh: "Sandbox" }, maxLength: 128 },
-      accept_shared_project: {
-        type: "boolean", default: false,
-        title: { en: "Allow trusted callers to share this project", zh: "允许可信调用者共享此项目" },
-        description: { en: "Sessions can share project files and resources", zh: "会话可能共享项目文件和资源" },
-      },
+      "agent_name": { "type": "string", "title": { "en": "Agent name", "zh": "Agent 名称" }, "maxLength": 128 },
+      "model": { "type": "string", "title": { "en": "Underlying model", "zh": "底层模型" }, "maxLength": 256 },
+      "sandbox_slug": { "type": "string", "title": { "en": "Sandbox", "zh": "Sandbox" }, "maxLength": 128 },
+      "accept_shared_project": {
+        "type": "boolean", "default": false,
+        "title": { "en": "Allow trusted callers to share this project", "zh": "允许可信调用者共享此项目" },
+        "description": { "en": "Sessions can share project files and resources", "zh": "会话可能共享项目文件和资源" }
+      }
     },
-    required: ["project_id"],
+    "required": ["project_id"]
   },
-  routes: [
-    { method: "POST", path: "/beeuni/v1/tasks", type: "submit", decode: "createTask", render: "taskCreated" },
-    { method: "GET", path: "/beeuni/v1/tasks/:task_id", type: "query", render: "taskStatus" },
+  "routes": [
+    { "method": "POST", "path": "/beeuni/v1/tasks", "type": "submit", "decode": "createTask", "render": "taskCreated" },
+    { "method": "GET", "path": "/beeuni/v1/tasks/:task_id", "type": "query", "render": "taskStatus" }
   ],
-  usageSchema: { tasks: { type: "number", unit: "count", description: { en: "Successful task unit price", zh: "成功任务单价" } } },
-  usageExamples: [{ label: "Agent task", facts: { tasks: 1 } }],
+  "usageSchema": { "tasks": { "type": "number", "unit": "count", "description": { "en": "Successful task unit price", "zh": "成功任务单价" } } },
+  "usageExamples": [{ "label": "Agent task", "facts": { "tasks": 1 } }]
 };
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
