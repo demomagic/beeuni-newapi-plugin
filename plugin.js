@@ -6,7 +6,7 @@ const MAX_OUTPUT_LENGTH = 131072;
 const STATUS_MAP = { pending: "SUBMITTED", running: "IN_PROGRESS", completed: "SUCCESS", failed: "FAILURE" };
 
 export const meta = {
-  apiVersion: 1, key: "beeuni", name: "Beeuni", version: "0.2.0", icon: "text:BE",
+  apiVersion: 1, key: "demomagic_beeuni", name: { en: "Beeuni", zh: "Beeuni 智能体" }, version: "0.2.0", icon: "text:BE",
   author: { name: "BeeuniLab", url: "https://github.com/BeeuniLab" },
   website: "https://beeuni.ai",
   description: { en: "Run Beeuni Agent tasks and retrieve their text results", zh: "运行 Beeuni Agent 任务并获取文本结果" },

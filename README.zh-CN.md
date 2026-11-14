@@ -66,7 +66,7 @@ Beeuni API 需提供 `GET /v1/projects/{project_id}/sessions/{session_id}/result
 
 价格字段 `tasks` 按成功任务数计量。New API 在提交前预扣一个任务单位，成功后按一个单位结算；失败时按 New API 的退款机制处理。
 
-在 New API 中设置 `beeuni::beeuni-agent` 的价格。例如，`u('tasks') * 0.01` 表示网关对每个成功任务收取 0.01 美元。这只是定价示例，不是 Beeuni 的价格。
+在 New API 中设置 `demomagic_beeuni::beeuni-agent` 的价格。例如，`u('tasks') * 0.01` 表示网关对每个成功任务收取 0.01 美元。这只是定价示例，不是 Beeuni 的价格。
 
 Beeuni 另行按实际使用量向管理员账号计费。任务失败、网关超时或客户端断开时，仍可能产生模型和 Computer 消耗。New API 退款不等于退还上游费用。插件不计算平台总成本、不限制 Beeuni 消费上限，也不会在网关超时时取消 Beeuni 任务。
 
@@ -135,3 +135,5 @@ Node.js 22 或更新版本仅用于运行本仓库的开发命令，安装插件
 执行 `npm test` 运行本地测试；`npm run check` 执行语法检查和测试，两者均不需要 Beeuni 凭据。`npm run pack:plugin` 生成插件分发包。
 
 单文件插件、双语使用说明和当前版本更新日志遵循[社区插件格式](https://github.com/QuantumNous/new-api-plugins/blob/main/docs/plugin-api/v1.md#usage-guide-readme)。上传插件不等于上架市场；上架需要另行提交并审核。
+
+社区插件标识为 `demomagic_beeuni`，显示名称为 Beeuni。本次版本标签为 `v0.2.0`。如果手动安装过标识为 `beeuni` 的早期开发版，请先停用旧插件，再安装新版、重新绑定渠道并设置价格。旧任务仍属于旧插件，请等它们结束后再切换。

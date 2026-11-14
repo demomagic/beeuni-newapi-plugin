@@ -68,7 +68,7 @@ The plugin calls Beeuni's existing session-creation, prompt-submission, and resu
 
 The `tasks` price field counts successful tasks. New API reserves one task unit before submission and settles one unit on success. A failed task follows New API's refund handling.
 
-Configure the price for `beeuni::beeuni-agent`. For example, `u('tasks') * 0.01` charges USD 0.01 per successful task at the gateway. This is a pricing example, not a Beeuni price.
+Configure the price for `demomagic_beeuni::beeuni-agent`. For example, `u('tasks') * 0.01` charges USD 0.01 per successful task at the gateway. This is a pricing example, not a Beeuni price.
 
 Beeuni bills the administrator's account separately for actual use. Failed tasks, gateway timeouts, and disconnected clients may still consume Beeuni model or Computer resources. A New API refund does not reverse those charges. The plugin does not meter total platform costs, enforce a Beeuni spending cap, or cancel a Beeuni task when the gateway times out.
 
@@ -137,3 +137,5 @@ Node.js 22 or later is needed only to run this repository's development commands
 Run `npm test` for local tests and `npm run check` for syntax checks and tests. Neither command requires Beeuni credentials. `npm run pack:plugin` creates the plugin distribution archive.
 
 The single-file plugin, bilingual usage guides, and version-specific release notes follow the [community plugin format](https://github.com/QuantumNous/new-api-plugins/blob/main/docs/plugin-api/v1.md#usage-guide-readme). Uploading a plugin does not list it in the marketplace; publication requires a separate submission and review.
+
+The community plugin key is `demomagic_beeuni`; the display name is Beeuni. Version tags use `v0.2.0` for this release. If you manually installed the earlier development plugin with key `beeuni`, disable it before installing this plugin, then bind the channel to the new key and configure its price. Existing tasks retain their original plugin identity; finish them before switching.

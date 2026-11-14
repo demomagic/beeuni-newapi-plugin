@@ -26,6 +26,8 @@ const continuation = {
 
 test('declares a direct Beeuni task channel with administrator configuration', () => {
   assert.equal(plugin.meta.apiVersion, 1);
+  assert.equal(plugin.meta.key, 'demomagic_beeuni');
+  assert.deepEqual(plugin.meta.name, { en: 'Beeuni', zh: 'Beeuni 智能体' });
   assert.equal(plugin.meta.version, '0.2.0');
   assert.equal(plugin.meta.baseUrl, 'https://api.beeuni.ai');
   assert.equal(plugin.meta.fetchMode, 'per_task');
@@ -33,6 +35,7 @@ test('declares a direct Beeuni task channel with administrator configuration', (
   assert.equal(plugin.meta.allowedHosts, undefined);
   assert.equal(plugin.meta.protocols, undefined);
   assert.deepEqual(plugin.meta.routes.map((route) => route.type), ['submit', 'query']);
+  assert.deepEqual(plugin.meta.routes.map((route) => route.path), ['/beeuni/v1/tasks', '/beeuni/v1/tasks/:task_id']);
   assert.ok(plugin.meta.channelConfig.required.includes('project_id'));
   for (const name of ['project_id', 'agent_name', 'model', 'sandbox_slug', 'accept_shared_project'])
     assert.ok(plugin.meta.channelConfig.properties[name]);
